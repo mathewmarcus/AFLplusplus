@@ -142,6 +142,38 @@ test -e ../afl-qemu-trace && {
           } || {
             $ECHO "$YELLOW[-] we got no data on executions performed? weird!"
           }
+
+          test -z "$IS_STATIC" -a `which gdb` && {
+              $ECHO "$GREY[*] running afl-fuzz for persistent qemu_mode getenv hook"
+              export AFL_QEMU_PERSISTENT_HOOK="./set-env-var.so"
+              cc -pie -fPIE -o test-getenv ./test-getenv.c
+              cc -fPIC -shared -o $AFL_QEMU_PERSISTENT_HOOK ./set-env-var.c
+              PERSISTENT_ADDR_LOWER_PART=`nm test-getenv | grep "T main" | awk '{print $1}'`
+              GETENV_ADDR_LOWER_PART=`gdb -batch -ex 'info addr getenv' test-getenv | grep -Eo '0x[0-9]+'`
+              if file test-getenv | grep -q "32-bit"; then
+                BASE_ADDR=0x40000000
+              else
+                BASE_ADDR=0x4000000000
+              fi
+              export AFL_QEMU_PERSISTENT_ADDR=`printf "0x%x" $(($BASE_ADDR + 0x$PERSISTENT_ADDR_LOWER_PART))`
+              export AFL_QEMU_PERSISTENT_GETENV_ADDR=`printf "0x%x" $(($BASE_ADDR + $GETENV_ADDR_LOWER_PART))`
+
+              rm -rf out/*
+              AFL_NO_CRASH_README=1 AFL_BENCH_UNTIL_CRASH=1 AFL_NO_UI=1 ../afl-fuzz -m ${MEM_LIMIT} -Q -i in -o out -- ./test-getenv >>errors 2>&1
+              unset AFL_QEMU_PERSISTENT_ADDR
+              unset AFL_QEMU_PERSISTENT_GETENV_ADDR
+              unset AFL_QEMU_PERSISTENT_HOOK
+
+              test -d out/default/crashes -a -n "`ls out/default/crashes`" && {
+                $ECHO "$GREEN[+] afl-fuzz is working correctly with persistent qemu_mode getenv hook"
+              } || {
+                echo CUT------------------------------------------------------------------CUT
+                cat errors
+                echo CUT------------------------------------------------------------------CUT
+                $ECHO "$RED[!] afl-fuzz is not working correctly with persistent qemu_mode getenv hook"
+                CODE=1
+              }
+          }
         } || {
           echo CUT------------------------------------------------------------------CUT
           cat errors

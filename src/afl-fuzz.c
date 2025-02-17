@@ -1091,6 +1091,7 @@ int main(int argc, char **argv_orig, char **envp) {
 
         if (afl->crash_mode) { FATAL("Multiple -C options not supported"); }
         afl->crash_mode = FSRV_RUN_CRASH;
+        setenv("__AFL_CRASH_EXPLORATION_MODE", "1", 1);
         break;
 
       case 'n':                                                /* dumb mode */

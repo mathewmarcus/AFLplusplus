@@ -3,7 +3,7 @@
 
 void afl_persistent_hook(struct x86_64_regs *regs, uint64_t guest_base,
                          uint8_t *input_buf, uint32_t input_buf_len) {
-  afl_persistent_setenv("HTTP_COOKIE", (char *)input_buf);
+  afl_persistent_setenv("HTTP_COOKIE", input_buf, input_buf_len);
 }
 
 int afl_persistent_hook_init(void) {
